@@ -2,6 +2,8 @@
 
 const vec2 = require('gl-vec2');
 
+console.log('test');
+
 export function generateNoiseTexture(regl, rng, size) {
   let l = size * size * 2;
   let array = new Uint8Array(l);
