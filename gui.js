@@ -24,6 +24,7 @@ export default class GUI extends React.Component {
       >
         <dg.Text label='Seed' value={this.state.seed} onFinishChange={this.props.onFinishChangeSeed.bind(this)}/>
         <dg.Button label='Randomize Seed' onClick={this.onClickRandomizeSeed.bind(this)}/>
+        <dg.Button label='Download' onClick={this.onClickDownload.bind(this)}/>
         <dg.Number
           label='Width'
           min={1}
@@ -57,6 +58,37 @@ export default class GUI extends React.Component {
       seed: seed,
     });
     this.props.onFinishChangeSeed(seed);
+  }
+
+  onClickDownload() {
+    let canvas = document.getElementById('render-canvas');
+    if (!canvas) return;
+
+    // Prefer toBlob for better memory usage
+    if (canvas.toBlob) {
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `space-2d-${Date.now()}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    } else {
+      // Fallback for older browsers
+      const dataURL = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = dataURL;
+      a.download = `space-2d-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
   }
 
 }
