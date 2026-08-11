@@ -5,7 +5,7 @@ const vec2 = require('gl-vec2');
 export function generateNoiseTexture(regl, rng, size) {
   let l = size * size * 2;
   let array = new Uint8Array(l);
-  for (let i = 0; i < l; i++) {
+  for (let i = 0; i < size * size; i++) {
     let r = vec2.random([]);
     array[i * 2 + 0] = Math.round(0.5 * (1.0 + r[0]) * 255);
     array[i * 2 + 1] = Math.round(0.5 * (1.0 + r[1]) * 255);
@@ -40,7 +40,7 @@ export function createRenderer(regl) {
       uniform sampler2D source, tNoise;
       uniform vec3 color;
       uniform vec2 offset;
-      uniform float scale, density, falloff, tNoiseSize;
+      uniform float scale, density, falloff, tNoiseSize, width;
       varying vec2 vUV;
 
       float smootherstep(float a, float b, float r) {
@@ -96,7 +96,18 @@ export function createRenderer(regl) {
 
       void main() {
         vec4 p = texture2D(source, vUV);
-        float n = noise(gl_FragCoord.xy * scale * 1.0);
+
+        // Calculate noise at current position and offset position
+        vec2 p1 = gl_FragCoord.xy * scale;
+        vec2 p2 = (gl_FragCoord.xy - vec2(width, 0.0)) * scale;
+
+        float n1 = noise(p1);
+        float n2 = noise(p2);
+
+        // Smooth horizontal cross-fade across the tile width
+        float blend = smootherstep(0.0, 1.0, vUV.x);
+        float n = mix(n1, n2, blend);
+
         n = pow(n + density, falloff);
         gl_FragColor = vec4(mix(p.rgb, color, n), 1);
       }
@@ -112,6 +123,7 @@ export function createRenderer(regl) {
       falloff: regl.prop('falloff'),
       color: regl.prop('color'),
       density: regl.prop('density'),
+      width: (context, props) => props.width || context.viewportWidth,
       tNoise: pgTexture,
       tNoiseSize: pgWidth
     },
