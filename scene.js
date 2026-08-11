@@ -129,6 +129,18 @@ export default class Scene {
       destination: undefined,
       viewport: viewport
     });
+
+    // Ensure GL commands complete and the browser has presented the new frame.
+    try {
+      const gl = this.regl && this.regl._gl;
+      if (gl && typeof gl.finish === 'function') {
+        gl.finish();
+      } else if (gl && typeof gl.flush === 'function') {
+        gl.flush();
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 }
 
