@@ -40,7 +40,7 @@ export function createRenderer(regl) {
       uniform sampler2D source, tNoise;
       uniform vec3 color;
       uniform vec2 offset;
-      uniform float scale, density, falloff, tNoiseSize;
+      uniform float density, falloff, tNoiseSize, tileCount, aspectRatio;
       varying vec2 vUV;
 
       float smootherstep(float a, float b, float r) {
@@ -49,17 +49,17 @@ export function createRenderer(regl) {
           return mix(a, b, r);
       }
 
-      float perlin_2d(vec2 p, float tileWidth) {
+      float perlin_2d(vec2 p, float gridWidth) {
           vec2 p0 = floor(p);
           vec2 p1 = p0 + vec2(1.0, 0.0);
           vec2 p2 = p0 + vec2(1.0, 1.0);
           vec2 p3 = p0 + vec2(0.0, 1.0);
 
-          // Wrap horizontal grid coordinates modulo tileWidth for seamless tiling
-          vec2 d0 = texture2D(tNoise, vec2(mod(p0.x, tileWidth), p0.y) / tNoiseSize).ba;
-          vec2 d1 = texture2D(tNoise, vec2(mod(p1.x, tileWidth), p1.y) / tNoiseSize).ba;
-          vec2 d2 = texture2D(tNoise, vec2(mod(p2.x, tileWidth), p2.y) / tNoiseSize).ba;
-          vec2 d3 = texture2D(tNoise, vec2(mod(p3.x, tileWidth), p3.y) / tNoiseSize).ba;
+          // Wrap horizontal grid coordinates modulo gridWidth
+          vec2 d0 = texture2D(tNoise, vec2(mod(p0.x, gridWidth), p0.y) / tNoiseSize).ba;
+          vec2 d1 = texture2D(tNoise, vec2(mod(p1.x, gridWidth), p1.y) / tNoiseSize).ba;
+          vec2 d2 = texture2D(tNoise, vec2(mod(p2.x, gridWidth), p2.y) / tNoiseSize).ba;
+          vec2 d3 = texture2D(tNoise, vec2(mod(p3.x, gridWidth), p3.y) / tNoiseSize).ba;
 
           d0 = 2.0 * d0 - 1.0;
           d1 = 2.0 * d1 - 1.0;
@@ -84,32 +84,31 @@ export function createRenderer(regl) {
           return smootherstep(m01, m32, fy);
       }
 
-      float normalnoise(vec2 p, float tileWidth) {
-          return perlin_2d(p, tileWidth) * 0.5 + 0.5;
+      float normalnoise(vec2 p, float gridWidth) {
+          return perlin_2d(p, gridWidth) * 0.5 + 0.5;
       }
 
-      float noise(vec2 p, float tileWidth) {
+      float noise(vec2 p, float baseTileCount) {
           p += offset;
           const int steps = 5;
           float sc = pow(2.0, float(steps));
           float displace = 0.0;
           for (int i = 0; i < steps; i++) {
-              displace = normalnoise(p * sc + displace, tileWidth);
+              displace = normalnoise(p * sc + displace, baseTileCount * sc);
               sc *= 0.5;
           }
-          return normalnoise(p + displace, tileWidth);
+          return normalnoise(p + displace, baseTileCount);
       }
 
       void main() {
         vec4 p = texture2D(source, vUV);
 
-        // tileWidth must be an integer to complete full periods across UV x [0, 1]
-        float tileWidth = max(1.0, floor(scale));
-        vec2 noisePos = vec2(vUV.x * tileWidth, vUV.y * scale);
+        // tileCount is an integer; aspectRatio keeps vertical proportion square
+        vec2 noisePos = vec2(vUV.x * tileCount, vUV.y * tileCount * aspectRatio);
 
-        float n = noise(noisePos, tileWidth);
+        float n = noise(noisePos, tileCount);
         n = pow(n + density, falloff);
-        gl_FragColor = vec4(mix(p.rgb, color, n), 1);
+        gl_FragColor = vec4(mix(p.rgb, color, n), 1.0);
       }
     `,
     attributes: {
@@ -119,7 +118,8 @@ export function createRenderer(regl) {
     uniforms: {
       source: regl.prop('source'),
       offset: regl.prop('offset'),
-      scale: regl.prop('scale'),
+      tileCount: regl.prop('tileCount'),
+      aspectRatio: regl.prop('aspectRatio'),
       falloff: regl.prop('falloff'),
       color: regl.prop('color'),
       density: regl.prop('density'),
