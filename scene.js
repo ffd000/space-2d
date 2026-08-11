@@ -12,7 +12,9 @@ export default class Scene {
 
   constructor(canvas) {
     this.canvas = canvas;
-    let regl = this.regl = REGL({ canvas: this.canvas });
+    // Preserve the drawing buffer so canvas.toDataURL / toBlob captures the rendered image.
+    // This can have a performance cost, but it's required for exporting the canvas contents.
+    let regl = this.regl = REGL({ canvas: this.canvas, attributes: { preserveDrawingBuffer: true } });
     this.pointStarTexture = regl.texture();
     this.ping = regl.framebuffer({color: regl.texture(), depth: false, stencil: false, depthStencil: false});
     this.pong = regl.framebuffer({color: regl.texture(), depth: false, stencil: false, depthStencil: false});
