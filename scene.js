@@ -33,6 +33,7 @@ export default class Scene {
     let height = this.canvas.height;
     let viewport = { x: 0, y: 0, width: width, height: height };
     let scale = props.shortScale ? Math.min(width, height) : Math.max(width, height);
+
     if (width !== this.lastWidth || height !== this.lastHeight) {
       ping.resize(width, height);
       pong.resize(width, height);
@@ -54,7 +55,7 @@ export default class Scene {
         format: 'rgb',
         width: width,
         height: height,
-        wrapS: 'clamp',
+        wrapS: 'repeat', // Tile point stars horizontally
         wrapT: 'clamp',
         data: data
       });
@@ -69,16 +70,18 @@ export default class Scene {
     let nebulaCount = 0;
     if (props.renderNebulae) nebulaCount = Math.round(rand.random() * 4 + 1);
     let nebulaOut = pingPong(ping, ping, pong, nebulaCount, (source, destination) => {
+      // Must be an integer for seamless horizontal tiling (e.g. 1, 2, or 3)
+      let tileCount = Math.floor(rand.random() * 3) + 1;
+
       this.nebulaRenderer({
         source: source,
         destination: destination,
         offset: [rand.random() * 100, rand.random() * 100],
-        scale: (rand.random() * 2 + 1) / scale,
+        tileCount: tileCount,
+        aspectRatio: height / width,
         color: [rand.random(), rand.random(), rand.random()],
         density: rand.random() * 0.2,
         falloff: rand.random() * 2.0 + 3.0,
-        width: width,
-        height: height,
         viewport: viewport
       });
     });
@@ -116,7 +119,7 @@ export default class Scene {
         source: starOut,
         destination: sunOut,
         viewport: viewport
-      })
+      });
     }
 
     this.copyRenderer({
@@ -124,36 +127,23 @@ export default class Scene {
       destination: undefined,
       viewport: viewport
     });
-
   }
-
 }
 
 function pingPong(initial, alpha, beta, count, func) {
-  // Bail if the render count is zero.
   if (count === 0) return initial;
-  // Make sure the initial FBO is not the same as the first
-  // output FBO.
   if (initial === alpha) {
     alpha = beta;
     beta = initial;
   }
-  // Render to alpha using initial as the source.
   func(initial, alpha);
-  // Keep track of how many times we've rendered. Currently one.
   let i = 1;
-  // If there's only one render, we're already done.
   if (i === count) return alpha;
-  // Keep going until we reach our render count.
   while (true) {
-    // Render to beta using alpha as the source.
     func(alpha, beta);
-    // If we've hit our count, we're done.
     i++;
     if (i === count) return beta;
-    // Render to alpha using beta as the source.
     func(beta, alpha);
-    // If we've hit our count, we're done.
     i++;
     if (i === count) return alpha;
   }
