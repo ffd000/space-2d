@@ -3,17 +3,21 @@ name: Build Bundle
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ main, gh-pages ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, gh-pages ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    permissions:
+          contents: write
+      
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
