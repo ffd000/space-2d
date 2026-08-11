@@ -5,7 +5,7 @@ const vec2 = require('gl-vec2');
 export function generateNoiseTexture(regl, rng, size) {
   let l = size * size * 2;
   let array = new Uint8Array(l);
-  for (let i = 0; i < size * size; i++) {
+  for (let i = 0; i < l; i++) {
     let r = vec2.random([]);
     array[i * 2 + 0] = Math.round(0.5 * (1.0 + r[0]) * 255);
     array[i * 2 + 1] = Math.round(0.5 * (1.0 + r[1]) * 255);
@@ -40,7 +40,7 @@ export function createRenderer(regl) {
       uniform sampler2D source, tNoise;
       uniform vec3 color;
       uniform vec2 offset;
-      uniform float scale, density, falloff, tNoiseSize, width;
+      uniform float scale, density, falloff, tNoiseSize;
       varying vec2 vUV;
 
       float smootherstep(float a, float b, float r) {
@@ -49,65 +49,65 @@ export function createRenderer(regl) {
           return mix(a, b, r);
       }
 
-      float perlin_2d(vec2 p) {
+      float perlin_2d(vec2 p, float tileWidth) {
           vec2 p0 = floor(p);
-          vec2 p1 = p0 + vec2(1, 0);
-          vec2 p2 = p0 + vec2(1, 1);
-          vec2 p3 = p0 + vec2(0, 1);
-          vec2 d0 = texture2D(tNoise, p0/tNoiseSize).ba;
-          vec2 d1 = texture2D(tNoise, p1/tNoiseSize).ba;
-          vec2 d2 = texture2D(tNoise, p2/tNoiseSize).ba;
-          vec2 d3 = texture2D(tNoise, p3/tNoiseSize).ba;
+          vec2 p1 = p0 + vec2(1.0, 0.0);
+          vec2 p2 = p0 + vec2(1.0, 1.0);
+          vec2 p3 = p0 + vec2(0.0, 1.0);
+
+          // Wrap horizontal grid coordinates modulo tileWidth for seamless tiling
+          vec2 d0 = texture2D(tNoise, vec2(mod(p0.x, tileWidth), p0.y) / tNoiseSize).ba;
+          vec2 d1 = texture2D(tNoise, vec2(mod(p1.x, tileWidth), p1.y) / tNoiseSize).ba;
+          vec2 d2 = texture2D(tNoise, vec2(mod(p2.x, tileWidth), p2.y) / tNoiseSize).ba;
+          vec2 d3 = texture2D(tNoise, vec2(mod(p3.x, tileWidth), p3.y) / tNoiseSize).ba;
+
           d0 = 2.0 * d0 - 1.0;
           d1 = 2.0 * d1 - 1.0;
           d2 = 2.0 * d2 - 1.0;
           d3 = 2.0 * d3 - 1.0;
+
           vec2 p0p = p - p0;
           vec2 p1p = p - p1;
           vec2 p2p = p - p2;
           vec2 p3p = p - p3;
+
           float dp0 = dot(d0, p0p);
           float dp1 = dot(d1, p1p);
           float dp2 = dot(d2, p2p);
           float dp3 = dot(d3, p3p);
+
           float fx = p.x - p0.x;
           float fy = p.y - p0.y;
+
           float m01 = smootherstep(dp0, dp1, fx);
           float m32 = smootherstep(dp3, dp2, fx);
-          float m01m32 = smootherstep(m01, m32, fy);
-          return m01m32;
+          return smootherstep(m01, m32, fy);
       }
 
-      float normalnoise(vec2 p) {
-          return perlin_2d(p) * 0.5 + 0.5;
+      float normalnoise(vec2 p, float tileWidth) {
+          return perlin_2d(p, tileWidth) * 0.5 + 0.5;
       }
 
-      float noise(vec2 p) {
+      float noise(vec2 p, float tileWidth) {
           p += offset;
           const int steps = 5;
-          float scale = pow(2.0, float(steps));
+          float sc = pow(2.0, float(steps));
           float displace = 0.0;
           for (int i = 0; i < steps; i++) {
-              displace = normalnoise(p * scale + displace);
-              scale *= 0.5;
+              displace = normalnoise(p * sc + displace, tileWidth);
+              sc *= 0.5;
           }
-          return normalnoise(p + displace);
+          return normalnoise(p + displace, tileWidth);
       }
 
       void main() {
         vec4 p = texture2D(source, vUV);
 
-        // Calculate noise at current position and offset position
-        vec2 p1 = gl_FragCoord.xy * scale;
-        vec2 p2 = (gl_FragCoord.xy - vec2(width, 0.0)) * scale;
+        // tileWidth must be an integer to complete full periods across UV x [0, 1]
+        float tileWidth = max(1.0, floor(scale));
+        vec2 noisePos = vec2(vUV.x * tileWidth, vUV.y * scale);
 
-        float n1 = noise(p1);
-        float n2 = noise(p2);
-
-        // Smooth horizontal cross-fade across the tile width
-        float blend = smootherstep(0.0, 1.0, vUV.x);
-        float n = mix(n1, n2, blend);
-
+        float n = noise(noisePos, tileWidth);
         n = pow(n + density, falloff);
         gl_FragColor = vec4(mix(p.rgb, color, n), 1);
       }
@@ -123,7 +123,6 @@ export function createRenderer(regl) {
       falloff: regl.prop('falloff'),
       color: regl.prop('color'),
       density: regl.prop('density'),
-      width: (context, props) => props.width || context.viewportWidth,
       tNoise: pgTexture,
       tNoiseSize: pgWidth
     },
