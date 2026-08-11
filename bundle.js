@@ -85,6 +85,7 @@ var GUI = function (_React$Component) {
         },
         _react2.default.createElement(dg.Text, { label: 'Seed', value: this.state.seed, onFinishChange: this.props.onFinishChangeSeed.bind(this) }),
         _react2.default.createElement(dg.Button, { label: 'Randomize Seed', onClick: this.onClickRandomizeSeed.bind(this) }),
+        _react2.default.createElement(dg.Button, { label: 'Download', onClick: this.onClickDownload.bind(this) }),
         _react2.default.createElement(dg.Number, {
           label: 'Width',
           min: 1,
@@ -118,6 +119,38 @@ var GUI = function (_React$Component) {
         seed: seed
       });
       this.props.onFinishChangeSeed(seed);
+    }
+  }, {
+    key: 'onClickDownload',
+    value: function onClickDownload() {
+      var canvas = document.getElementById('render-canvas');
+      if (!canvas) return;
+
+      // Prefer toBlob for better memory usage
+      if (canvas.toBlob) {
+        canvas.toBlob(function (blob) {
+          if (!blob) return;
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = 'space-2d-' + Date.now() + '.png';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        }, 'image/png');
+      } else {
+        // Fallback for older browsers
+        var dataURL = canvas.toDataURL('image/png');
+        var a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = dataURL;
+        a.download = 'space-2d-' + Date.now() + '.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
     }
   }]);
 
